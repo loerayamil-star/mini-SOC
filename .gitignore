@@ -1,0 +1,21 @@
+# Artefactos del instalador de Wazuh — contienen certificados y contraseñas
+wazuh-install-files.tar
+wazuh-install-files/
+wazuh-passwords*.txt
+wazuh-install.sh
+*.pem
+*.key
+
+# Notas privadas de arquitectura — detalle interno de mi infraestructura, nunca al repo público
+contexto_homelab.md
+contexto_minisoc.md
+
+# Logs y temporales
+*.log
+*.tmp
+
+# Basura de editores y SO
+.vscode/
+.idea/
+*.swp
+.DS_Store
