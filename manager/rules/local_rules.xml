@@ -1,0 +1,122 @@
+<!--
+  local_rules.xml — Fase 2 del Mini-SOC
+  Reglas BASE de categorización + un par de reglas de ejemplo con umbrales de punto de
+  partida. La calibración fina y las reglas "reales" de detección son la Fase 3 (las escribo
+  yo, no Claude — división de trabajo, sección 4 de contexto_minisoc.md).
+
+  IDs custom arrancan en 100000 (convención oficial de Wazuh, evita chocar con el ruleset
+  stock que se actualiza con cada versión de Wazuh).
+
+  Aplicar en el LXC 103 (Manager) como /var/ossec/etc/rules/local_rules.xml.
+  Validar sintaxis ANTES de aplicar: /var/ossec/bin/wazuh-manager -t
+-->
+<group name="local,mini-soc,">
+
+  <!-- ==================== Pi-hole (100000-100099) ==================== -->
+
+  <rule id="100000" level="3">
+    <decoded_as>pihole-query</decoded_as>
+    <description>Pi-hole: consulta DNS.</description>
+    <group>pihole,dns_query,</group>
+  </rule>
+
+  <rule id="100001" level="3">
+    <decoded_as>pihole-blocked</decoded_as>
+    <description>Pi-hole: consulta DNS bloqueada por gravity.</description>
+    <group>pihole,dns_blocked,</group>
+  </rule>
+
+  <!--
+    Ejemplo de punto de partida, NO umbral final: 30 bloqueos en 2 minutos en TODA la red
+    (no por cliente individual — ver limitación documentada en local_decoder.xml). Un
+    dispositivo infectado "llamando a casa" repetidamente es un patrón típico; un usuario
+    normal navegando también puede generar varios bloqueos seguidos por publicidad en una
+    sola página. Calibrar con datos reales de tu red antes de tratarlo como alerta confiable.
+  -->
+  <rule id="100002" level="10" frequency="30" timeframe="120">
+    <if_matched_sid>100001</if_matched_sid>
+    <description>Pi-hole: pico de consultas DNS bloqueadas en la red (posible malware llamando a casa, o falso positivo de una página con mucha publicidad — calibrar).</description>
+    <group>pihole,dns_blocked,mini_soc_needs_tuning,</group>
+  </rule>
+
+
+  <!-- ==================== Nginx Proxy Manager (100100-100199) ==================== -->
+
+  <rule id="100100" level="3">
+    <decoded_as>npm-access-fields</decoded_as>
+    <description>NPM: acceso vía reverse proxy.</description>
+    <group>npm,web_access,</group>
+  </rule>
+
+  <rule id="100101" level="5">
+    <if_sid>100100</if_sid>
+    <field name="status">^40[13]$|^404$</field>
+    <description>NPM: acceso fallido (401/403/404) vía reverse proxy.</description>
+    <group>npm,authentication_failed,</group>
+  </rule>
+
+  <!-- Ejemplo de punto de partida: 6 fallos en 2 minutos desde la misma IP cliente. -->
+  <rule id="100102" level="8" frequency="6" timeframe="120">
+    <if_matched_sid>100101</if_matched_sid>
+    <same_source_ip />
+    <description>NPM: posible fuerza bruta o escaneo — múltiples 401/403/404 desde la misma IP.</description>
+    <group>npm,authentication_failures,mini_soc_needs_tuning,</group>
+  </rule>
+
+  <!--
+    Rutas típicas de escaneo automatizado/probing contra paneles no expuestos aquí (WordPress,
+    phpMyAdmin, .env, .git). Lista de partida, no exhaustiva — amplíala según lo que veas en
+    tus logs reales.
+  -->
+  <rule id="100103" level="7">
+    <if_sid>100100</if_sid>
+    <field name="url">wp-admin|wp-login|phpmyadmin|\.env|\.git/|xmlrpc\.php</field>
+    <description>NPM: solicitud a ruta típica de escaneo/probing automatizado.</description>
+    <group>npm,web_scan,</group>
+  </rule>
+
+
+  <!-- ==================== Docker / Homepage (100200-100299) ==================== -->
+  <!--
+    NOTA HONESTA: no verifiqué en vivo los nombres exactos de campo que produce el wodle
+    docker-listener en la versión instalada — estos nombres de campo son los documentados
+    públicamente para el formato de eventos de la API de Docker. Confirmar contra un evento
+    real (checklist de Fase 2) antes de confiar en estas reglas.
+  -->
+
+  <rule id="100200" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="Type">container</field>
+    <description>Docker: evento de ciclo de vida de contenedor.</description>
+    <group>docker,</group>
+  </rule>
+
+  <rule id="100201" level="7">
+    <if_sid>100200</if_sid>
+    <field name="Action">^die$|^stop$|^kill$|^oom$</field>
+    <description>Docker: contenedor detenido o murió inesperadamente ($(Actor.Attributes.name)).</description>
+    <group>docker,docker_container_stopped,</group>
+  </rule>
+
+  <!-- Ejemplo de punto de partida: 3 paradas/reinicios del mismo contenedor en 5 minutos. -->
+  <rule id="100202" level="10" frequency="3" timeframe="300">
+    <if_matched_sid>100201</if_matched_sid>
+    <description>Docker: contenedor en bucle de reinicios — posible crash loop o ataque de disponibilidad.</description>
+    <group>docker,mini_soc_needs_tuning,</group>
+  </rule>
+
+
+  <!-- ==================== Proxmox host: FIM /etc/pve (100300-100399) ==================== -->
+  <!--
+    SSH del host NO necesita reglas custom — el host es Debian y hereda el ruleset stock de
+    Wazuh para sshd/PAM (incluye la regla 5763 de fuerza bruta SSH) en cuanto se instale el
+    agente. Estas reglas solo cubren FIM sobre /etc/pve, que sí es custom.
+  -->
+  <rule id="100300" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file">^/etc/pve</field>
+    <description>Proxmox: cambio detectado en /etc/pve (configuración de cluster/VMs/LXCs).</description>
+    <group>proxmox,syscheck,configuration_changed,</group>
+  </rule>
+
+</group>

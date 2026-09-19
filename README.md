@@ -78,7 +78,7 @@ resolución de nombres de todos los dispositivos.
 
 | Recurso | Valor | Justificación |
 |---|---|---|
-| RAM | 6144 MB (+512 swap) | El all-in-one en régimen estable usa ~4–4.5GB con heap ajustado: indexador (OpenSearch, heap fijado a 2GB), manager (~0.5–1GB), dashboard (Node.js, ~0.5–1GB), filebeat (~0.2GB). 6GB da margen de picos y deja ~6GB libres en el host de 16GB. |
+| RAM | 6144 MB (+512 swap) | El all-in-one en régimen estable usa ~4–4.5GB con heap ajustado: indexador (OpenSearch, heap fijado a 2GB, esto sí documentado), manager/dashboard/filebeat se reparten el resto. 6GB da margen de picos y deja ~6GB libres en el host de 16GB. |
 | vCPU | 2 | Con 3 agentes el volumen de eventos es mínimo. En LXC es un tope, no una reserva — quedan 2 núcleos del i5-4570 para el host y los otros LXCs. |
 | Disco | 30 GB | Con 3 agentes de homelab, el indexador acumula MBs/día, no GBs. Alcanza para meses; la retención fina se ajusta en Fase 2. |
 | Tipo | No privilegiado + `nesting=1` | Mínimo privilegio. `nesting` es necesario para systemd en contenedores no privilegiados. |
@@ -88,6 +88,13 @@ resolución de nombres de todos los dispositivos.
 **Contexto oficial:** Wazuh recomienda 8GB/8vCPU para 50–100 agentes y documenta 4GB/2vCPU
 como mínimo para 1–25. Yo tengo **3 agentes** — mi sizing está entre el mínimo y el
 recomendado, ajustado a la realidad de mi host, no copiado de la documentación empresarial.
+
+**Honestidad sobre esta tabla (auditoría del 19-sep-2026):** la cifra total de 6GB y el heap
+del indexador (2GB) sí están sourceados contra la documentación oficial de Wazuh. El
+desglose de cuánto usa cada componente individual (manager, dashboard, filebeat) NO lo
+encontré documentado en ninguna fuente oficial — es una estimación de ingeniería razonable
+mía, no un dato citado. Lo digo explícitamente para no hacerla pasar por más certeza de la
+que tiene.
 
 ## Decisiones de diseño que ya tomé (y no reabro sin repensarlas en serio)
 
@@ -120,6 +127,16 @@ contienen detalle interno de mi infraestructura). Lo esencial para entender este
    aparte, cambia el perfil de seguridad.
 4. **Credenciales del instalador:** se imprimen UNA vez al final de `wazuh-install.sh`. Las
    guardo de inmediato (el script 04 me lo recuerda). Nunca se commitean a este repo.
+5. **El Manager centralizado es ahora un punto de control root-equivalente sobre 4 sistemas**
+   (auditoría del 19-sep-2026, tras agregar el agente en el host Proxmox en la Fase 2). Con
+   configuración por grupos, si alguien comprometiera el LXC 103, podría empujar config
+   maliciosa a cualquier agente — incluido el host físico. El agente ya corre como root en
+   cada sistema (así funciona Wazuh), así que esto no es un privilegio nuevo por sí mismo,
+   pero SÍ concentra el radio de impacto en un solo punto que antes no existía. Riesgo
+   aceptado explícitamente por ahora: el dashboard queda en el LAN sin reverse proxy (por la
+   misma razón de desacople que Proxmox), con credenciales generadas por el instalador. Lo
+   que esto sí cambia es la prioridad de mi fase de SSL local futura: cuando la haga, el
+   Manager de Wazuh entra primero, no NPM.
 
 ## Mantenimiento
 

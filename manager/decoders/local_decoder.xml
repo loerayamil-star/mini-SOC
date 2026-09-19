@@ -1,0 +1,58 @@
+<!--
+  local_decoder.xml — Fase 2 del Mini-SOC
+  Decoders custom, organizados por fuente. Archivo canónico de Wazuh para contenido propio
+  (se carga por default vía la config de ruleset del Manager, sin tocar ossec.conf).
+
+  Aplicar en el LXC 103 (Manager) como /var/ossec/etc/decoders/local_decoder.xml.
+  Validar sintaxis ANTES de aplicar: /var/ossec/bin/wazuh-manager -t
+-->
+<ossec_config>
+
+  <!-- ==================== Pi-hole (LXC 100) ==================== -->
+  <!--
+    Formato dnsmasq de Pi-hole v6 en /var/log/pihole/pihole.log, estilo syslog:
+      Sep 16 14:32:10 dnsmasq[123]: query[A] doubleclick.net from 192.168.1.50
+      Sep 16 14:32:10 dnsmasq[123]: gravity blocked doubleclick.net is 0.0.0.0
+
+    LIMITACIÓN CONOCIDA (documentada en docs/fase2-fuentes-datos.md): la línea "gravity
+    blocked" no repite la IP del cliente — eso solo está en la línea "query" precedente,
+    correlacionada por PID de dnsmasq. Este decoder NO intenta esa correlación.
+  -->
+  <decoder name="pihole-dnsmasq">
+    <program_name>^dnsmasq</program_name>
+  </decoder>
+
+  <decoder name="pihole-query">
+    <parent>pihole-dnsmasq</parent>
+    <prematch>^query\[\w+\] </prematch>
+    <regex offset="after_parent">^query\[\w+\] (\S+) from (\S+)$</regex>
+    <order>domain, srcip</order>
+  </decoder>
+
+  <decoder name="pihole-blocked">
+    <parent>pihole-dnsmasq</parent>
+    <prematch>^gravity blocked </prematch>
+    <regex offset="after_parent">^gravity blocked (\S+) is (\S+)$</regex>
+    <order>domain, block_target</order>
+  </decoder>
+
+
+  <!-- ==================== Nginx Proxy Manager (LXC 101, contenedor Docker) ==================== -->
+  <!--
+    Log de acceso por proxy-host (formato propio de NPM, no Apache combined):
+      [16/Sep/2026:14:32:10 +0000] - 200 200 - GET dash.home "/admin/" [Client 192.168.1.50] [Length 5321] [Gzip -] [Sent-to 192.168.0.55:3000] "Mozilla/5.0" "-"
+
+    ADVERTENCIA: armado contra documentación pública, NO contra un log real de este NPM.
+    Confirmar el formato exacto (checklist de Fase 2) antes de depender de este decoder.
+  -->
+  <decoder name="npm-access">
+    <prematch>^\[\d+/\w+/\d+:\d+:\d+:\d+ \S+\] - \d+ \d+ - \w+ </prematch>
+  </decoder>
+
+  <decoder name="npm-access-fields">
+    <parent>npm-access</parent>
+    <regex offset="after_parent">^\[(\S+ \S+)\] - (\d+) \d+ - (\w+) (\S+) "(\S+)" \[Client (\S+)\] \[Length (\d+)\]</regex>
+    <order>timestamp, status, http_method, host, url, srcip, size</order>
+  </decoder>
+
+</ossec_config>

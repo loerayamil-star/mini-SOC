@@ -34,6 +34,15 @@ if [[ "$(hostname)" != "wazuh" ]]; then
     echo "[FALLA] Hostname '$(hostname)' ≠ 'wazuh'. ¿Seguro que es el LXC 103? Aborto." >&2
     exit 1
 fi
+# Auditoría 19-sep-2026, Hallazgo C: sin esta guarda, correr el instalador all-in-one dos
+# veces sobre una instalación existente (p. ej. reintentando a ciegas tras un timeout) puede
+# generar conflictos de certificados/config. 05-instalar-agente.sh ya tenía esta guarda;
+# a este script le faltaba.
+if dpkg -s wazuh-manager >/dev/null 2>&1; then
+    echo "[FALLA] wazuh-manager ya está instalado aquí. ¿Corriste esto dos veces?" >&2
+    echo "        Para reinstalar desde cero: pct rollback 103 pre-wazuh-install (ver checklist)." >&2
+    exit 1
+fi
 
 echo "=== Instalación de Wazuh $WAZUH_BRANCH (all-in-one) en $(hostname) ==="
 echo
@@ -76,6 +85,19 @@ echo
 echo "Fijando heap del indexador a $HEAP (antes: $(grep -E '^-Xm[sx]' /etc/wazuh-indexer/jvm.options | tr '\n' ' '))..."
 sed -i "s/^-Xms.*/-Xms$HEAP/; s/^-Xmx.*/-Xmx$HEAP/" /etc/wazuh-indexer/jvm.options
 # Xms=Xmx a propósito: heap fijo evita pausas de resize del GC y hace el consumo predecible.
+
+# Auditoría 19-sep-2026, Hallazgo D: el 'sed' de arriba no da error si el patrón no
+# coincide (p. ej. si una versión futura de Wazuh cambia el formato de jvm.options) — en ese
+# caso el indexador arrancaría en silencio con el heap por defecto (~50% de la RAM, ~3GB en
+# este LXC de 6GB), 1GB más de lo planeado, sin que te enteres. Verificar explícitamente:
+APPLIED=$(grep -c -- "-Xm[sx]$HEAP" /etc/wazuh-indexer/jvm.options || true)
+if [[ "$APPLIED" -lt 2 ]]; then
+    echo "[FALLA] El heap NO quedó fijado a $HEAP (el sed no encontró el patrón esperado)." >&2
+    echo "        Revisa a mano: /etc/wazuh-indexer/jvm.options" >&2
+    exit 1
+fi
+echo "[OK] Heap confirmado en $HEAP."
+
 systemctl restart wazuh-indexer
 echo "Esperando a que el indexador vuelva (30-90s en HDD)..."
 for i in $(seq 1 18); do

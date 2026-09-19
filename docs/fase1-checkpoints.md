@@ -72,6 +72,18 @@ El script pide confirmación antes de crear. Al terminar:
 - [ ] `pct exec 103 -- ping -c2 192.168.0.53` responde (red y DNS del contenedor OK)
 - [ ] Existe el snapshot: `pct listsnapshot 103` muestra `pre-wazuh-install`
 
+**Si el script se detiene a la mitad** (por ejemplo `pct create` funcionó pero `pct start`
+falló por un problema de red): el snapshot todavía no existe en ese punto, y volver a correr
+el script se niega porque el CTID 103 ya existe. Recuperación (auditoría 19-sep-2026,
+Hallazgo B):
+
+```bash
+pct destroy 103 --purge   # limpia el intento fallido por completo
+bash /root/fase1-scripts/03-crear-lxc.sh   # reintenta desde cero
+```
+
+No hay nada que recuperar del intento fallido — no llegó a instalarse nada dentro.
+
 **Paso manual — DNS local:** en la UI de Pi-hole (`http://pihole.home/admin` →
 Settings → Local DNS Records) registra:
 
@@ -107,6 +119,20 @@ sus logs): NO improvises. El fallback es recrear el 103 como privilegiado, pero 
 perfil de seguridad del contenedor — trae la decisión de vuelta a una sesión con Claude o
 documenta tú el tradeoff antes de hacerlo.
 
+**Si necesitas reintentar `04-instalar-wazuh.sh` completo** (falló a la mitad y quieres
+empezar limpio en vez de depurar): el script ahora se niega a correr si detecta
+`wazuh-manager` ya instalado (auditoría 19-sep-2026, Hallazgo C — antes no tenía esta guarda,
+y correr el instalador all-in-one dos veces sobre una instalación parcial puede generar
+conflictos de certificados). Para reintentar de verdad desde cero:
+
+```bash
+# Desde el host:
+pct stop 103
+pct rollback 103 pre-wazuh-install   # vuelve al LXC recién creado, sin nada de Wazuh
+pct start 103
+# Y desde dentro del LXC, corre 04-instalar-wazuh.sh de nuevo
+```
+
 ---
 
 ## Checkpoint A3 — Antes del primer agente
@@ -121,10 +147,15 @@ Regla por cada LXC, sin excepción: **snapshot ANTES de instalar**.
 ```bash
 # En el host:
 pct snapshot 102 pre-wazuh-agent
+pct push 102 <(echo "$(date -u +%FT%TZ)") /root/.pre-wazuh-agent-snapshot-ok
 pct push 102 /root/fase1-scripts/05-instalar-agente.sh /root/05-instalar-agente.sh
 pct enter 102
 bash /root/05-instalar-agente.sh homepage
 ```
+
+La segunda línea (`pct push ... .pre-wazuh-agent-snapshot-ok`) deja una marca dentro del LXC
+que el script SÍ puede verificar (no puede llamar a `pct` desde adentro) — sin ella,
+`05-instalar-agente.sh` se niega a instalar (auditoría 19-sep-2026, Hallazgo A).
 
 - [ ] Agente aparece **Active** en el dashboard de Wazuh (Agents management → Summary)
 - [ ] Homepage sigue funcionando: `http://dash.home` carga CON todos sus widgets
@@ -135,6 +166,7 @@ bash /root/05-instalar-agente.sh homepage
 
 ```bash
 pct snapshot 101 pre-wazuh-agent
+pct push 101 <(echo "$(date -u +%FT%TZ)") /root/.pre-wazuh-agent-snapshot-ok
 pct push 101 /root/fase1-scripts/05-instalar-agente.sh /root/05-instalar-agente.sh
 pct enter 101
 bash /root/05-instalar-agente.sh npm
@@ -158,6 +190,7 @@ bash /root/05-instalar-agente.sh npm
 
 ```bash
 pct snapshot 100 pre-wazuh-agent
+pct push 100 <(echo "$(date -u +%FT%TZ)") /root/.pre-wazuh-agent-snapshot-ok
 pct push 100 /root/fase1-scripts/05-instalar-agente.sh /root/05-instalar-agente.sh
 pct enter 100
 bash /root/05-instalar-agente.sh pihole

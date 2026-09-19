@@ -8,10 +8,18 @@
 #   LXC 100:  bash 05-instalar-agente.sh pihole    <- SOLO tras pasar el Checkpoint A4
 #
 # Cómo llegar aquí (desde el host, ejemplo con el 102):
-#   pct snapshot 102 pre-wazuh-agent               <- SIEMPRE el snapshot PRIMERO
+#   pct snapshot 102 pre-wazuh-agent                                    <- SIEMPRE el snapshot PRIMERO
+#   pct push 102 <(echo "$(date -u +%FT%TZ)") /root/.pre-wazuh-agent-snapshot-ok  <- marca verificable
 #   pct push 102 /root/fase1-scripts/05-instalar-agente.sh /root/05-instalar-agente.sh
 #   pct enter 102
 #   bash /root/05-instalar-agente.sh homepage
+#
+# AUDITORÍA (19-sep-2026, Hallazgo A): antes este script solo PREGUNTABA si ya habías
+# tomado el snapshot y aceptaba un "si" tecleado sin verificar nada — no hay forma de que
+# un script corriendo DENTRO del LXC compruebe algo con 'pct' (vive en el host, y de
+# cualquier forma un LXC no privilegiado no debería tener ese control). La marca de archivo
+# de arriba es la verificación real: solo puede existir si el paso de snapshot en el host
+# ya corrió.
 #
 # Qué hace: agrega el repo apt oficial de Wazuh, instala wazuh-agent apuntando al
 # Manager (192.168.0.56), lo arranca, verifica la conexión, y DESACTIVA el repo al
@@ -50,10 +58,19 @@ fi
 
 echo "=== Agente Wazuh -> '$AGENT_NAME' (en $(hostname), Manager $MANAGER_IP) ==="
 echo
-echo "Regla de la fase: snapshot ANTES de instalar. Desde el host debió correrse:"
-echo "    pct snapshot <ID> pre-wazuh-agent"
-read -rp "¿Confirmas que el snapshot 'pre-wazuh-agent' de ESTE LXC ya existe? (escribe 'si'): " RESP
-[[ "$RESP" == "si" ]] || { echo "Cancelado. Haz el snapshot primero — es tu rollback."; exit 1; }
+
+# Verificación REAL, no una pregunta de confianza: el paso de snapshot en el host debió
+# dejar esta marca justo después de 'pct snapshot' (ver comentario de cabecera). Si no
+# existe, no hay snapshot confirmado -- no hay excepción a esta regla.
+SNAPSHOT_MARKER=/root/.pre-wazuh-agent-snapshot-ok
+if [[ ! -f "$SNAPSHOT_MARKER" ]]; then
+    echo "[FALLA] No encuentro $SNAPSHOT_MARKER." >&2
+    echo "        Eso significa que el paso de snapshot en el HOST no se hizo (o se saltó)." >&2
+    echo "        Desde el host: pct snapshot <ID> pre-wazuh-agent" >&2
+    echo "                       pct push <ID> <(echo ok) $SNAPSHOT_MARKER" >&2
+    exit 1
+fi
+echo "[OK] Snapshot confirmado (marca de $(cat "$SNAPSHOT_MARKER"))."
 
 # --- Repo oficial de Wazuh ----------------------------------------------------
 apt-get update
