@@ -11,10 +11,13 @@ este sizing, por qué este orden de despliegue.
 
 ## Quick Start (el día de la ejecución)
 
+Los valores entre `< >` (`<IP_PROXMOX>`, `<IP_PIHOLE>`, `<IP_NPM>`, `<IP_HOMEPAGE>`, `<IP_WAZUH>`)
+son placeholders: no publico las IPs reales de mi laboratorio. Cada quien los sustituye por los de su red.
+
 ```bash
 # 0. Desde mi laptop: copiar los scripts al host Proxmox
-scp -r scripts/ root@192.168.0.232:/root/fase1-scripts/
-ssh root@192.168.0.232
+scp -r scripts/ root@<IP_PROXMOX>:/root/fase1-scripts/
+ssh root@<IP_PROXMOX>
 
 # 1. Precheck de solo lectura (aborta si la RAM nueva no está instalada)
 bash /root/fase1-scripts/01-precheck-host.sh
@@ -42,7 +45,7 @@ los checkpoints A1–A4 son compuertas de "pasa / no pasa".
 - **El módulo de RAM de 8GB DDR3 FÍSICAMENTE instalado** en el OptiPlex (16GB totales) — no
   solo comprado. El script 01 lo verifica y aborta si detecta menos de ~12GB; esa fue mi
   decisión explícita para no ejecutar al límite de recursos.
-- **Acceso SSH como root al host Proxmox** (`root@192.168.0.232`). Con contraseña basta;
+- **Acceso SSH como root al host Proxmox** (`root@<IP_PROXMOX>`). Con contraseña basta;
   una llave `ed25519` con `ssh-copy-id` es más cómodo.
 - **Proxmox VE 9.x** (los scripts usan `pct`/`pveam`/`pvesm` con la sintaxis actual; en mi
   host corre 9.2.2).
@@ -64,7 +67,7 @@ checkpoints de verificación (A1–A4) entre cada script. Resumen del orden:
 
 | # | Script | Dónde se corre | Qué hace |
 |---|---|---|---|
-| 1 | `scripts/01-precheck-host.sh` | Host Proxmox (SSH a 192.168.0.232) | Solo lectura: verifica RAM≈16GB, CTID 103 libre, disco, plantilla Debian 12 |
+| 1 | `scripts/01-precheck-host.sh` | Host Proxmox (SSH a <IP_PROXMOX>) | Solo lectura: verifica RAM≈16GB, CTID 103 libre, disco, plantilla Debian 12 |
 | 2 | `scripts/02-prep-host.sh` | Host Proxmox | Único cambio al host: `vm.max_map_count=262144` (lo exige el indexador; un LXC no puede fijarlo) |
 | 3 | `scripts/03-crear-lxc.sh` | Host Proxmox | Crea el LXC 103 con el sizing de abajo + snapshot `pre-wazuh-install` |
 | 4 | `scripts/04-instalar-wazuh.sh` | Dentro del LXC 103 | Instalador oficial all-in-one + ajuste de heap a 2GB + verificación de servicios |
@@ -82,7 +85,7 @@ resolución de nombres de todos los dispositivos.
 | vCPU | 2 | Con 3 agentes el volumen de eventos es mínimo. En LXC es un tope, no una reserva — quedan 2 núcleos del i5-4570 para el host y los otros LXCs. |
 | Disco | 30 GB | Con 3 agentes de homelab, el indexador acumula MBs/día, no GBs. Alcanza para meses; la retención fina se ajusta en Fase 2. |
 | Tipo | No privilegiado + `nesting=1` | Mínimo privilegio. `nesting` es necesario para systemd en contenedores no privilegiados. |
-| IP | 192.168.0.56 estática | Siguiente en la secuencia (.53 Pi-hole, .54 NPM, .55 Homepage). Se registra `wazuh.home` en Pi-hole. |
+| IP | <IP_WAZUH> estática | Siguiente en la secuencia (.53 Pi-hole, .54 NPM, .55 Homepage). Se registra `wazuh.home` en Pi-hole. |
 | Arranque | `onboot=1` | El SOC debe levantarse solo tras un corte de luz. |
 
 **Contexto oficial:** Wazuh recomienda 8GB/8vCPU para 50–100 agentes y documenta 4GB/2vCPU

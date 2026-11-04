@@ -27,7 +27,7 @@
    ejecutar por accidente con la RAM vieja. Queda documentado un sizing de contingencia
    (4GB + heap 1GB) por si la decisión cambiara, con sus tradeoffs.
 2. **Sizing del LXC 103:** 6144MB RAM + 512MB swap, 2 vCPU (tope, no reserva), 30GB disco,
-   Debian 12 no privilegiado con `nesting=1`, IP estática 192.168.0.56, `onboot=1`, heap del
+   Debian 12 no privilegiado con `nesting=1`, IP estática <IP_WAZUH>, `onboot=1`, heap del
    indexador fijado a 2GB post-instalación (el default de OpenSearch tomaría ~3GB, el 50% de
    la RAM del contenedor — excesivo para 3 agentes). Justificación completa en el README.
 3. **Instalador all-in-one oficial (`wazuh-install.sh -a`), no arquitectura distribuida:**
