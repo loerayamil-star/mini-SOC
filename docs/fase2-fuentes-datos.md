@@ -24,7 +24,7 @@ existiendo y sigue en formato estilo-syslog de dnsmasq — no lo reemplazó la b
 para este propósito:
 
 ```
-Sep 16 14:32:10 dnsmasq[123]: query[A] doubleclick.net from 192.168.1.50
+Sep 16 14:32:10 dnsmasq[123]: query[A] doubleclick.net from 192.0.2.50
 Sep 16 14:32:10 dnsmasq[123]: gravity blocked doubleclick.net is 0.0.0.0
 ```
 
@@ -54,7 +54,7 @@ sistema de archivos del LXC (bind mount), no solo un volumen interno de Docker.
 **Formato:** NPM usa un formato propio, no el "combined" de Apache:
 
 ```
-[16/Sep/2026:14:32:10 +0000] - 200 200 - GET dash.home "/admin/" [Client 192.168.1.50] [Length 5321] [Gzip -] [Sent-to 192.168.0.55:3000] "Mozilla/5.0" "-"
+[16/Sep/2026:14:32:10 +0000] - 200 200 - GET dash.home "/admin/" [Client 192.0.2.50] [Length 5321] [Gzip -] [Sent-to 192.0.2.55:3000] "Mozilla/5.0" "-"
 ```
 
 **Advertencia explícita:** armé el decoder contra este formato basado en documentación pública

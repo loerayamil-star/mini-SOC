@@ -13,13 +13,13 @@ El script 01 lo verifica y aborta si no.
 Desde la laptop, entra por SSH al Proxmox:
 
 ```bash
-ssh root@192.168.0.232
+ssh root@<IP_PROXMOX>
 ```
 
 Copia la carpeta `scripts/` al host (desde la laptop):
 
 ```bash
-scp -r scripts/ root@192.168.0.232:/root/fase1-scripts/
+scp -r scripts/ root@<IP_PROXMOX>:/root/fase1-scripts/
 ```
 
 ---
@@ -69,7 +69,7 @@ bash /root/fase1-scripts/03-crear-lxc.sh
 El script pide confirmación antes de crear. Al terminar:
 
 - [ ] `pct list` muestra el 103 corriendo con hostname `wazuh`
-- [ ] `pct exec 103 -- ping -c2 192.168.0.53` responde (red y DNS del contenedor OK)
+- [ ] `pct exec 103 -- ping -c2 <IP_PIHOLE>` responde (red y DNS del contenedor OK)
 - [ ] Existe el snapshot: `pct listsnapshot 103` muestra `pre-wazuh-install`
 
 **Si el script se detiene a la mitad** (por ejemplo `pct create` funcionó pero `pct start`
@@ -87,7 +87,7 @@ No hay nada que recuperar del intento fallido — no llegó a instalarse nada de
 **Paso manual — DNS local:** en la UI de Pi-hole (`http://pihole.home/admin` →
 Settings → Local DNS Records) registra:
 
-- [ ] `wazuh.home` → `192.168.0.56`
+- [ ] `wazuh.home` → `<IP_WAZUH>`
 
 ---
 
@@ -105,7 +105,7 @@ bash /root/fase1-scripts/04-instalar-wazuh.sh   # cópialo dentro antes, o usa: 
       (Respaldo: quedan cifradas en `wazuh-install-files.tar` en el directorio donde corriste
       el instalador — no lo borres hasta confirmar que guardaste todo.)
 - [ ] Los 4 servicios activos: `systemctl status wazuh-indexer wazuh-manager filebeat wazuh-dashboard`
-- [ ] Dashboard carga: `https://wazuh.home` (o `https://192.168.0.56`) desde la laptop —
+- [ ] Dashboard carga: `https://wazuh.home` (o `https://<IP_WAZUH>`) desde la laptop —
       acepta el certificado autofirmado, login con las credenciales guardadas
 - [ ] Prueba de fuego: reinicia el LXC (`pct reboot 103` desde el host) y verifica que los
       4 servicios levantan solos y el dashboard vuelve a cargar (tarda 2–4 min en HDD)
@@ -174,7 +174,7 @@ bash /root/05-instalar-agente.sh npm
 
 - [ ] Agente **Active** en el dashboard
 - [ ] NPM sigue proxyando: `http://dash.home` y `http://pihole.home/admin` cargan desde la laptop
-- [ ] La UI de NPM (`http://192.168.0.54:81`) responde
+- [ ] La UI de NPM (`http://<IP_NPM>:81`) responde
 
 ### Checkpoint A4 — Antes de Pi-hole (LXC 100)
 
@@ -197,8 +197,8 @@ bash /root/05-instalar-agente.sh pihole
 ```
 
 - [ ] Agente **Active** en el dashboard
-- [ ] Pi-hole sigue resolviendo: desde la laptop, `dig @192.168.0.53 google.com` responde
-- [ ] Pi-hole sigue bloqueando: `dig @192.168.0.53 doubleclick.net` devuelve `0.0.0.0`
+- [ ] Pi-hole sigue resolviendo: desde la laptop, `dig @<IP_PIHOLE> google.com` responde
+- [ ] Pi-hole sigue bloqueando: `dig @<IP_PIHOLE> doubleclick.net` devuelve `0.0.0.0`
 - [ ] La UI (`http://pihole.home/admin`) carga y muestra estadísticas moviéndose
 
 ---

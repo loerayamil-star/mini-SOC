@@ -14,10 +14,10 @@ cubrir SSH del host ni cambios en `/etc/pve`.
 
 ```bash
 # Desde la laptop: copiar el script al host
-scp scripts/fase2/01-instalar-agente-host.sh root@192.168.0.232:/root/
+scp scripts/fase2/01-instalar-agente-host.sh root@<IP_PROXMOX>:/root/
 
 # En el host:
-ssh root@192.168.0.232
+ssh root@<IP_PROXMOX>
 bash /root/01-instalar-agente-host.sh
 ```
 
@@ -33,8 +33,8 @@ bash /root/01-instalar-agente-host.sh
 
 ```bash
 # Desde la laptop: copiar el árbol de configuración completo al host, y de ahí al LXC 103
-scp -r manager/ root@192.168.0.232:/root/fase2-source/
-ssh root@192.168.0.232
+scp -r manager/ root@<IP_PROXMOX>:/root/fase2-source/
+ssh root@<IP_PROXMOX>
 
 # En el host: pasar el árbol al LXC (pct push no soporta directorios completos)
 mkdir -p /root/fase2-config
